@@ -1,0 +1,4 @@
+/* 페이지 로드 시 JS 가 누르는 동기화 버튼 (화면에는 숨김) */
+.prompt-builder-hidden {
+    display: none !important;
+}
