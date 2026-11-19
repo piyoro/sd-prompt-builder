@@ -92,6 +92,56 @@ def combine(*parts):
     return ", ".join(p for p in (_clean(x) for x in parts) if p)
 
 
+# 붙여넣기 형식 (변환기 랜덤 생성기 등에서 복사한 텍스트):
+#   # sd-prompt-builder        <- '#' 로 시작하는 줄은 무시
+#   hair: short hair, red hair
+#   eyes: blue eyes   # 파란 눈  <- 줄 끝 '#' 뒤는 주석 (한글 뜻 등)
+# key 대신 한글 영역 이름(머리, 눈, 의상 ...)도 받습니다.
+_LINE_RE = re.compile(r"^\s*\[?\s*([^\s:\]]+?)\s*\]?\s*[:=]\s*(.*)$")
+
+
+def _label_alias(label):
+    """'4. 머리' -> '머리', '7. 소품 / 액세서리' -> '소품/액세서리'"""
+    label = re.sub(r"^\s*\d+\.\s*", "", label)
+    return re.sub(r"\s+", "", label)
+
+
+def _section_aliases():
+    aliases = {}
+    for key, label, _ in POSITIVE_SECTIONS + NEGATIVE_SECTIONS:
+        aliases[key] = key
+        # '주제(누가/무엇을)' -> '주제', '기타(LoRA,임베딩등)' -> '기타'
+        base = re.sub(r"\(.*?\)", "", _label_alias(label))
+        aliases.setdefault(base, key)
+        # '소품/액세서리' 처럼 / 로 나뉜 이름은 각각도 받음 ('소품', '액세서리')
+        for part in base.split("/"):
+            if part:
+                aliases.setdefault(part, key)
+    return aliases
+
+
+SECTION_ALIASES = _section_aliases()
+
+
+def parse_pasted(text):
+    """붙여넣은 텍스트 -> {key: tags}. 알 수 없는 줄은 무시합니다."""
+    result = {}
+    for raw in (text or "").replace("\r", "").split("\n"):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        m = _LINE_RE.match(line)
+        if not m:
+            continue
+        key = SECTION_ALIASES.get(m.group(1).lower()) or SECTION_ALIASES.get(m.group(1))
+        if not key:
+            continue
+        tags = _clean(m.group(2).split("#", 1)[0])
+        if tags:
+            result[key] = combine(result[key], tags) if key in result else tags
+    return result
+
+
 def _preset_visible():
     return getattr(shared.opts, "forge_preset", "sd") in VISIBLE_PRESETS
 
@@ -176,6 +226,24 @@ class PromptBuilderScript(scripts.Script):
                 with gr.Tab("Negative"):
                     neg_boxes = _make_boxes(tab, NEGATIVE_SECTIONS, NEGATIVE_ROWS)
 
+            with gr.Accordion("붙여넣기 (변환기 랜덤 생성기 결과 → 영역에 반영)", open=False):
+                paste_box = _no_save(gr.Textbox(
+                    label="붙여넣기",
+                    placeholder="hair: short hair, red hair\neyes: blue eyes\npose: standing\n\n"
+                                "빌더의 아무 칸에 이 형식으로 붙여넣어도 바로 반영됩니다.",
+                    lines=4,
+                    max_lines=16,
+                    elem_id=f"{tab}_prompt_builder_paste",
+                ))
+                with gr.Row():
+                    append = _no_save(gr.Checkbox(
+                        label="기존 내용 뒤에 추가 (끄면 해당 영역을 덮어씀)",
+                        value=False,
+                        elem_id=f"{tab}_prompt_builder_paste_append",
+                    ))
+                    paste_btn = gr.Button("영역에 반영", size="sm", variant="primary",
+                                          elem_id=f"{tab}_prompt_builder_paste_apply")
+
             with gr.Row():
                 default_btn = gr.Button("기본값으로 되돌리기", size="sm")
                 clear_btn = gr.Button("모두 비우기", size="sm")
@@ -217,5 +285,25 @@ class PromptBuilderScript(scripts.Script):
         default_btn.click(lambda: [default_value(k, t) for k, _, t in sections], outputs=all_boxes,
                           queue=False, show_progress=False)
         clear_btn.click(lambda: ["" for _ in sections], outputs=all_boxes, queue=False, show_progress=False)
+
+        keys = [k for k, _, _ in sections]
+
+        def apply_paste(text, do_append, *values):
+            parsed = parse_pasted(text)
+            if not parsed:
+                return [gr.update() for _ in keys] + [gr.update()]
+            out = []
+            for key, current in zip(keys, values):
+                if key not in parsed:
+                    out.append(gr.update())
+                elif do_append:
+                    out.append(combine(current, parsed[key]))
+                else:
+                    out.append(parsed[key])
+            # 반영하고 나면 붙여넣기 칸은 비움
+            return out + [""]
+
+        paste_btn.click(apply_paste, inputs=[paste_box, append] + all_boxes, outputs=all_boxes + [paste_box],
+                        queue=False, show_progress=False)
 
         return []
