@@ -16,23 +16,27 @@ from modules import scripts, script_callbacks, shared
 
 
 # (key, 라벨, 기본값) — 이 순서대로 합쳐집니다. 기본값은 placeholder 로도 쓰입니다.
+# 구도/앵글은 그림 전체의 틀을 정하므로 주제 앞에 둡니다
+# (SD 1.5 는 75토큰 단위로 끊어 읽어서, 뒤쪽 단어일수록 약해짐).
 # 외형/표정 순서: 머리 -> 눈 -> 옷 -> 소품 -> 자세 -> 손 -> 시선 -> 표정
+# key 는 변환기(sd-prompt-translator)의 section 값과 같아야 합니다.
 POSITIVE_SECTIONS = [
     ("quality", "1. 품질 / 형식", "RAW photo, 8k uhd, high quality"),
-    ("subject", "2. 주제 (누가 / 무엇을)", "portrait of a young woman"),
-    ("hair", "3. 머리", "brown hair"),
-    ("eyes", "4. 눈", "brown eyes"),
-    ("clothing", "5. 의상", "casual sweater"),
-    ("accessory", "6. 소품 / 액세서리", "silver necklace"),
-    ("pose", "7. 자세", "sitting"),
-    ("hands", "8. 손 / 동작", "holding a coffee cup"),
-    ("gaze", "9. 시선", "looking at viewer"),
-    ("expression", "10. 표정", "soft smile"),
-    ("setting", "11. 배경 / 장소", "in a cozy cafe"),
-    ("lighting", "12. 조명 / 분위기", "natural window light"),
-    ("camera", "13. 구도 / 카메라", "shallow depth of field, bokeh background, dslr"),
-    ("style", "14. 스타일 / 질감", "film grain, Fujifilm XT3"),
-    ("extra", "15. 기타 (LoRA, 임베딩 등)", "<lora:name:0.8>"),
+    ("composition", "2. 구도 / 앵글", "upper body, eye level"),
+    ("subject", "3. 주제 (누가 / 무엇을)", "portrait of a young woman"),
+    ("hair", "4. 머리", "brown hair"),
+    ("eyes", "5. 눈", "brown eyes"),
+    ("clothing", "6. 의상", "casual sweater"),
+    ("accessory", "7. 소품 / 액세서리", "silver necklace"),
+    ("pose", "8. 자세", "sitting"),
+    ("hands", "9. 손 / 동작", "holding a coffee cup"),
+    ("gaze", "10. 시선", "looking at viewer"),
+    ("expression", "11. 표정", "soft smile"),
+    ("setting", "12. 배경 / 장소", "in a cozy cafe"),
+    ("lighting", "13. 조명 / 분위기", "natural window light"),
+    ("camera", "14. 렌즈 / 촬영 효과", "shallow depth of field, bokeh background, dslr"),
+    ("style", "15. 스타일 / 질감", "film grain, Fujifilm XT3"),
+    ("extra", "16. 기타 (LoRA, 임베딩 등)", "<lora:name:0.8>"),
 ]
 
 # 기본값을 채우지 않고 placeholder 로만 보여줄 칸
@@ -51,7 +55,8 @@ NEGATIVE_SECTIONS = [
 
 # 두 칸씩 한 줄에 배치 (key 기준)
 POSITIVE_ROWS = [
-    ("quality", "subject"),
+    ("quality", "composition"),
+    ("subject",),
     ("hair", "eyes"),
     ("clothing", "accessory"),
     ("pose", "hands"),
